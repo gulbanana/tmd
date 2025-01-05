@@ -1,22 +1,35 @@
-use std::io::{stdin, Read};
-
+use anyhow::{anyhow, Result};
 use chumsky::prelude::*;
+use std::io::{stdin, Read};
+use text::newline;
 
 #[derive(Clone, Debug)]
-enum AST {
-    Text(String),
-}
+struct AST(Vec<String>);
 
-fn main() {
+fn main() -> Result<()> {
     let mut input = String::new();
-    stdin().lock().read_to_string(&mut input).unwrap();
-    let output = parser().parse(input);
-    println!("{output:?}");
+    stdin().lock().read_to_string(&mut input)?;
+
+    let output = parser().parse(input).map_err(|err| anyhow!("{err:?}"))?;
+
+    for graf in output.0.iter() {
+        println!("<p>{0}</p>", graf.trim_end());
+    }
+
+    Ok(())
 }
 
 fn parser() -> impl Parser<char, AST, Error = Simple<char>> {
-    any()
+    let graf_break = newline().repeated().at_least(2);
+
+    let graf = graf_break
+        .not()
         .repeated()
-        .map(|chars| AST::Text(chars.into_iter().collect()))
+        .at_least(1)
+        .map(|chars| chars.into_iter().collect());
+
+    graf.padded_by(graf_break.or_not())
+        .repeated()
+        .map(|grafs| AST(grafs))
         .then_ignore(end())
 }
